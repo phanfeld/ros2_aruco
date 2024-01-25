@@ -40,6 +40,8 @@ from geometry_msgs.msg import PoseArray, Pose
 from ros2_aruco_interfaces.msg import ArucoMarkers
 from rcl_interfaces.msg import ParameterDescriptor, ParameterType
 
+from tf2_ros import TransformBroadcaster
+from geometry_msgs.msg import TransformStamped
 
 class ArucoNode(rclpy.node.Node):
     def __init__(self):
@@ -139,6 +141,7 @@ class ArucoNode(rclpy.node.Node):
         # Set up publishers
         self.poses_pub = self.create_publisher(PoseArray, "aruco_poses", 10)
         self.markers_pub = self.create_publisher(ArucoMarkers, "aruco_markers", 10)
+        self.tfbr = TransformBroadcaster(self)
 
         # Set up fields for camera parameters
         self.info_msg = None
@@ -150,6 +153,8 @@ class ArucoNode(rclpy.node.Node):
         self.detector = cv2.aruco.ArucoDetector(dictionary, parameters)
 
         self.bridge = CvBridge()
+
+        self.im_count = 0
 
     def info_callback(self, info_msg):
         self.info_msg = info_msg
@@ -187,6 +192,13 @@ class ArucoNode(rclpy.node.Node):
                 rvecs, tvecs = cv2.aruco.estimatePoseSingleMarkers(
                     corners, self.marker_size, self.intrinsic_mat, self.distortion
                 )
+
+            # debug marker pose
+            # image_with_marker = cv2.drawFrameAxes(cv_image, self.intrinsic_mat, self.distortion, rvecs, tvecs, 0.1)
+            # cv2.imwrite(f"/home/pia/PyHoverAir/aruco_detection/img_{self.im_count:06d}.png", image_with_marker)
+            # self.im_count += 1
+                
+            msgs = []
             for i, marker_id in enumerate(marker_ids):
                 pose = Pose()
                 pose.position.x = tvecs[i][0][0]
@@ -206,8 +218,23 @@ class ArucoNode(rclpy.node.Node):
                 markers.poses.append(pose)
                 markers.marker_ids.append(marker_id[0])
 
+                msg = TransformStamped()
+                msg.header.stamp = self.get_clock().now().to_msg()
+                msg.header.frame_id = 'camera_frame'
+                msg.child_frame_id = f"marker_{marker_id[0]}"
+                msg.transform.translation.x = pose.position.x
+                msg.transform.translation.y = pose.position.y
+                msg.transform.translation.z = pose.position.z
+                msg.transform.rotation.x = quat[0]
+                msg.transform.rotation.y = quat[1]
+                msg.transform.rotation.z = quat[2]
+                msg.transform.rotation.w = quat[3]
+                msgs.append(msg)
+                
+
             self.poses_pub.publish(pose_array)
             self.markers_pub.publish(markers)
+            self.tfbr.sendTransform(msgs)
 
 
 def main():
