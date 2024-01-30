@@ -201,7 +201,7 @@ class ArucoNode(rclpy.node.Node):
             msgs = []
             for i, marker_id in enumerate(marker_ids):
                 pose = Pose()
-                pose.position.x = tvecs[i][0][0]
+                pose.position.x = tvecs[i][0][0] * -1
                 pose.position.y = tvecs[i][0][1]
                 pose.position.z = tvecs[i][0][2]
 
@@ -220,8 +220,8 @@ class ArucoNode(rclpy.node.Node):
 
                 msg = TransformStamped()
                 msg.header.stamp = self.get_clock().now().to_msg()
-                msg.header.frame_id = 'camera_frame'
-                msg.child_frame_id = f"marker_{marker_id[0]}"
+                msg.header.frame_id = f"marker_{marker_id[0]}"
+                msg.child_frame_id = 'camera_frame'
                 msg.transform.translation.x = pose.position.x
                 msg.transform.translation.y = pose.position.y
                 msg.transform.translation.z = pose.position.z
